@@ -30,10 +30,22 @@ private slots:
      */
     void newGame();
 
+    /**
+     * @brief 保存游戏槽函数
+     */
+    void saveGame();
+
+    /**
+     * @brief 加载游戏槽函数
+     */
+    void loadGame();
+
 private:
     Board *board;              ///< 棋盘对象指针
     QPushButton *resetButton;  ///< 重新开始按钮指针
     QPushButton *newGameButton; ///< 新游戏按钮指针
+    QPushButton *saveButton;    ///< 保存游戏按钮指针
+    QPushButton *loadButton;    ///< 加载游戏按钮指针
     GameDialog::GameMode currentGameMode;  ///< 当前游戏模式
     int currentAIDifficulty;   ///< 当前AI难度
     int currentUndoLimit;      ///< 当前允许的悔棋次数

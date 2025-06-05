@@ -383,4 +383,69 @@ void Board::showGameOver(Player winner)
     // 显示游戏结束对话框
     QString message = (winner == Player::Black) ? "黑方胜利！" : "白方胜利！";
     QMessageBox::information(this, "游戏结束", message);
+}
+
+bool Board::saveGameState(const QString& filename)
+{
+    GameSave::SaveData data;
+    
+    // 保存基本信息
+    data.timestamp = QDateTime::currentDateTime();
+    data.isAIEnabled = aiEnabled;
+    data.aiDifficulty = aiDifficulty;
+    data.undoLimit = remainingUndos;  // 保存当前剩余次数作为限制
+    data.remainingUndos = remainingUndos;
+    data.currentPlayer = static_cast<int>(currentPlayer);
+    
+    // 保存棋盘状态
+    data.board.resize(BOARD_SIZE, std::vector<int>(BOARD_SIZE));
+    for (int i = 0; i < BOARD_SIZE; ++i) {
+        for (int j = 0; j < BOARD_SIZE; ++j) {
+            data.board[i][j] = static_cast<int>(board[i][j]);
+        }
+    }
+    
+    // 保存移动历史
+    std::stack<Move> tempHistory = moveHistory;
+    while (!tempHistory.empty()) {
+        const Move& move = tempHistory.top();
+        data.history.insert(data.history.begin(), 
+            GameSave::Move(move.row, move.col, move.player));  // 直接使用 Player 枚举
+        tempHistory.pop();
+    }
+    
+    return GameSave::saveGame(filename, data);
+}
+
+bool Board::loadGameState(const QString& filename)
+{
+    GameSave::SaveData data;
+    if (!GameSave::loadGame(filename, data)) {
+        return false;
+    }
+    
+    // 加载基本信息
+    aiEnabled = data.isAIEnabled;
+    aiDifficulty = data.aiDifficulty;
+    remainingUndos = data.remainingUndos;
+    currentPlayer = static_cast<Player>(data.currentPlayer);
+    gameOver = false;  // 重新加载时重置游戏结束状态
+    
+    // 加载棋盘状态
+    for (int i = 0; i < BOARD_SIZE; ++i) {
+        for (int j = 0; j < BOARD_SIZE; ++j) {
+            board[i][j] = static_cast<Player>(data.board[i][j]);
+        }
+    }
+    
+    // 加载移动历史
+    while (!moveHistory.empty()) {
+        moveHistory.pop();
+    }
+    for (const auto& move : data.history) {
+        moveHistory.push(Move(move.row, move.col, static_cast<Player>(move.player)));
+    }
+    
+    update();  // 重绘棋盘
+    return true;
 } 

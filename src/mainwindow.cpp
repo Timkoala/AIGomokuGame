@@ -2,6 +2,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QWidget>
+#include <QFileDialog>
+#include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -30,6 +32,14 @@ MainWindow::MainWindow(QWidget *parent)
     // 创建重新开始按钮
     resetButton = new QPushButton("重新开始", this);
     buttonLayout->addWidget(resetButton);
+
+    // 创建保存游戏按钮
+    saveButton = new QPushButton("保存游戏", this);
+    buttonLayout->addWidget(saveButton);
+
+    // 创建加载游戏按钮
+    loadButton = new QPushButton("加载游戏", this);
+    buttonLayout->addWidget(loadButton);
     
     mainLayout->addLayout(buttonLayout);
     
@@ -39,6 +49,8 @@ MainWindow::MainWindow(QWidget *parent)
     // 连接信号和槽
     connect(resetButton, &QPushButton::clicked, this, &MainWindow::resetGame);
     connect(newGameButton, &QPushButton::clicked, this, &MainWindow::newGame);
+    connect(saveButton, &QPushButton::clicked, this, &MainWindow::saveGame);
+    connect(loadButton, &QPushButton::clicked, this, &MainWindow::loadGame);
     
     // 设置窗口大小
     resize(600, 650);
@@ -66,5 +78,50 @@ void MainWindow::newGame()
         currentUndoLimit = dialog.getUndoLimit();
         // 使用新的设置重置游戏
         resetGame();
+    }
+}
+
+void MainWindow::saveGame()
+{
+    QString filename = QFileDialog::getSaveFileName(
+        this,
+        "保存游戏",
+        QString(),
+        "五子棋存档 (*.gomoku);;所有文件 (*.*)"
+    );
+    
+    if (filename.isEmpty()) {
+        return;
+    }
+    
+    // 如果用户没有指定扩展名，添加默认扩展名
+    if (!filename.endsWith(".gomoku", Qt::CaseInsensitive)) {
+        filename += ".gomoku";
+    }
+    
+    if (board->saveGameState(filename)) {
+        QMessageBox::information(this, "成功", "游戏已成功保存！");
+    } else {
+        QMessageBox::warning(this, "错误", "保存游戏失败！");
+    }
+}
+
+void MainWindow::loadGame()
+{
+    QString filename = QFileDialog::getOpenFileName(
+        this,
+        "加载游戏",
+        QString(),
+        "五子棋存档 (*.gomoku);;所有文件 (*.*)"
+    );
+    
+    if (filename.isEmpty()) {
+        return;
+    }
+    
+    if (board->loadGameState(filename)) {
+        QMessageBox::information(this, "成功", "游戏已成功加载！");
+    } else {
+        QMessageBox::warning(this, "错误", "加载游戏失败！");
     }
 } 

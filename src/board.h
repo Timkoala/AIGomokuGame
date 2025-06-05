@@ -5,6 +5,8 @@
 #include <vector>
 #include <random>
 #include <stack>
+#include "game_types.h"
+#include "gamesave.h"
 
 /**
  * @brief 棋盘类
@@ -33,6 +35,20 @@ public:
      */
     void resetGame(bool enableAI = false, int difficulty = 3, int undoLimit = 3);
 
+    /**
+     * @brief 保存当前游戏状态
+     * @param filename 存档文件名
+     * @return 是否保存成功
+     */
+    bool saveGameState(const QString& filename);
+
+    /**
+     * @brief 加载游戏状态
+     * @param filename 存档文件名
+     * @return 是否加载成功
+     */
+    bool loadGameState(const QString& filename);
+
 protected:
     /**
      * @brief 绘制事件处理函数
@@ -51,15 +67,6 @@ private:
     static const int CELL_SIZE = 35;     ///< 每个格子的大小（像素）
     static const int MARGIN = 20;        ///< 棋盘边距（像素）
     
-    /**
-     * @brief 玩家枚举
-     */
-    enum class Player { 
-        None,   ///< 空位
-        Black,  ///< 黑方
-        White   ///< 白方
-    };
-
     /**
      * @brief 移动记录结构体
      */
