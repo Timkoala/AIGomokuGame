@@ -10,6 +10,7 @@ GameDialog::GameDialog(QWidget *parent)
     , aiStrategy("RuleBased")
     , aiDifficulty(3)
     , undoLimit(3)  // 默认允许3次悔棋
+    , playerPieceType(PieceType::BLACK)  // 默认玩家执黑
 {
     setWindowTitle("游戏设置");
     
@@ -31,7 +32,7 @@ GameDialog::GameDialog(QWidget *parent)
     strategyLabel = new QLabel("AI策略:", this);
     strategyComboBox = new QComboBox(this);
     strategyComboBox->addItem("规则基础AI");  // RuleBased
-    // 这里可以添加更多AI策略
+    strategyComboBox->addItem("A*启发式搜索AI");  // AStar
     strategyLayout->addWidget(strategyLabel);
     strategyLayout->addWidget(strategyComboBox);
     mainLayout->addLayout(strategyLayout);
@@ -46,12 +47,23 @@ GameDialog::GameDialog(QWidget *parent)
     difficultyLayout->addWidget(difficultyLabel);
     difficultyLayout->addWidget(difficultySpinBox);
     mainLayout->addLayout(difficultyLayout);
+
+    // 创建玩家棋子颜色选择
+    QHBoxLayout *colorLayout = new QHBoxLayout;
+    colorLabel = new QLabel("玩家执子:", this);
+    colorComboBox = new QComboBox(this);
+    colorComboBox->addItem("执黑");
+    colorComboBox->addItem("执白");
+    colorComboBox->setEnabled(false);  // 默认禁用（双人模式下无需选择）
+    colorLayout->addWidget(colorLabel);
+    colorLayout->addWidget(colorComboBox);
+    mainLayout->addLayout(colorLayout);
     
     // 创建悔棋次数设置
     QHBoxLayout *undoLayout = new QHBoxLayout;
     undoLabel = new QLabel("允许悔棋次数:", this);
     undoSpinBox = new QSpinBox(this);
-    undoSpinBox->setRange(0, 10);  // 允许0-10次悔棋
+    undoSpinBox->setRange(0, 10);
     undoSpinBox->setValue(3);      // 默认3次
     undoLayout->addWidget(undoLabel);
     undoLayout->addWidget(undoSpinBox);
@@ -70,6 +82,8 @@ GameDialog::GameDialog(QWidget *parent)
             this, &GameDialog::onGameModeChanged);
     connect(strategyComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &GameDialog::onAIStrategyChanged);
+    connect(colorComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &GameDialog::onPlayerColorChanged);
     connect(buttonBox, &QDialogButtonBox::accepted, this, &GameDialog::onOkClicked);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &GameDialog::reject);
     
@@ -91,6 +105,8 @@ void GameDialog::onGameModeChanged(int index)
     strategyComboBox->setEnabled(isAIMode);
     difficultyLabel->setEnabled(isAIMode);
     difficultySpinBox->setEnabled(isAIMode);
+    colorLabel->setEnabled(isAIMode);
+    colorComboBox->setEnabled(isAIMode);
 }
 
 void GameDialog::onAIStrategyChanged(int index)
@@ -100,11 +116,19 @@ void GameDialog::onAIStrategyChanged(int index)
         case 0:
             aiStrategy = "RuleBased";
             break;
-        // 这里可以添加更多策略的处理
+        case 1:
+            aiStrategy = "AStar";
+            break;
         default:
             aiStrategy = "RuleBased";
             break;
     }
+}
+
+void GameDialog::onPlayerColorChanged(int index)
+{
+    // 设置玩家选择的棋子颜色
+    playerPieceType = (index == 0) ? PieceType::BLACK : PieceType::WHITE;
 }
 
 void GameDialog::onOkClicked()

@@ -11,43 +11,38 @@ void RuleBasedAI::setDifficulty(int level) {
     difficulty = std::clamp(level, 1, 5);
 }
 
-int RuleBasedAI::getDifficulty() const {
-    return difficulty;
-}
-
-QPoint RuleBasedAI::getNextMove(const std::vector<std::vector<PieceType>>& board,
-                               PieceType currentPlayer) {
+Move RuleBasedAI::getNextMove(const Board& board, PieceType currentPlayer) {
     auto emptyPositions = getEmptyPositions(board);
     if (emptyPositions.empty()) {
-        return QPoint(-1, -1);
+        return Move{-1, -1};
     }
 
     // 如果是第一步，选择靠近中心的位置
-    if (emptyPositions.size() == board.size() * board.size()) {
-        int center = static_cast<int>(board.size()) / 2;
-        return QPoint(center, center);
+    if (emptyPositions.size() == board.getSize() * board.getSize()) {
+        int center = board.getSize() / 2;
+        return Move{center, center};
     }
 
     // 根据难度级别评估不同的策略
-    std::vector<std::pair<int, QPoint>> scoredMoves;
-    const int boardSize = static_cast<int>(board.size());
+    std::vector<std::pair<int, Move>> scoredMoves;
+    const int boardSize = board.getSize();
     const int boardCenter = boardSize / 2;
     
     for (const auto& pos : emptyPositions) {
-        int score = evaluatePosition(board, pos.x(), pos.y(), currentPlayer);
+        int score = evaluatePosition(board, pos.row, pos.col, currentPlayer);
         
         // 根据难度增加评估的复杂度
         if (difficulty >= 2) {
             // 考虑对手的威胁
             score = std::max(score, 
-                evaluatePosition(board, pos.x(), pos.y(), 
-                    currentPlayer == PieceType::Black ? PieceType::White : PieceType::Black));
+                evaluatePosition(board, pos.row, pos.col, 
+                    currentPlayer == PieceType::BLACK ? PieceType::WHITE : PieceType::BLACK));
         }
         
         if (difficulty >= 3) {
             // 考虑位置的战略价值
-            int centerDistance = abs(pos.x() - boardCenter) + 
-                               abs(pos.y() - boardCenter);
+            int centerDistance = abs(pos.row - boardCenter) + 
+                               abs(pos.col - boardCenter);
             score += (boardSize - centerDistance) * 2;
         }
         
@@ -56,7 +51,7 @@ QPoint RuleBasedAI::getNextMove(const std::vector<std::vector<PieceType>>& board
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dy = -1; dy <= 1; dy++) {
                     if (dx == 0 && dy == 0) continue;
-                    score += checkLine(board, pos.x(), pos.y(), dx, dy, currentPlayer) * 10;
+                    score += checkLine(board, pos.row, pos.col, dx, dy, currentPlayer) * 10;
                 }
             }
         }
@@ -83,8 +78,7 @@ QPoint RuleBasedAI::getNextMove(const std::vector<std::vector<PieceType>>& board
     }
 }
 
-int RuleBasedAI::evaluatePosition(const std::vector<std::vector<PieceType>>& board,
-                                 int row, int col, PieceType currentPlayer) {
+int RuleBasedAI::evaluatePosition(const Board& board, int row, int col, PieceType currentPlayer) {
     int score = 0;
     
     // 检查八个方向
@@ -109,8 +103,7 @@ int RuleBasedAI::evaluatePosition(const std::vector<std::vector<PieceType>>& boa
     return score;
 }
 
-int RuleBasedAI::checkLine(const std::vector<std::vector<PieceType>>& board,
-                          int row, int col, int dRow, int dCol,
+int RuleBasedAI::checkLine(const Board& board, int row, int col, int dRow, int dCol,
                           PieceType currentPlayer) {
     int count = 1;  // 包含当前位置
     int r, c;
@@ -118,7 +111,7 @@ int RuleBasedAI::checkLine(const std::vector<std::vector<PieceType>>& board,
     // 向一个方向检查
     r = row + dRow;
     c = col + dCol;
-    while (isValidPosition(r, c) && board[r][c] == currentPlayer) {
+    while (isValidPosition(r, c) && board.getPiece(r, c) == currentPlayer) {
         count++;
         r += dRow;
         c += dCol;
@@ -127,7 +120,7 @@ int RuleBasedAI::checkLine(const std::vector<std::vector<PieceType>>& board,
     // 向相反方向检查
     r = row - dRow;
     c = col - dCol;
-    while (isValidPosition(r, c) && board[r][c] == currentPlayer) {
+    while (isValidPosition(r, c) && board.getPiece(r, c) == currentPlayer) {
         count++;
         r -= dRow;
         c -= dCol;
@@ -136,13 +129,13 @@ int RuleBasedAI::checkLine(const std::vector<std::vector<PieceType>>& board,
     return count;
 }
 
-std::vector<QPoint> RuleBasedAI::getEmptyPositions(
-    const std::vector<std::vector<PieceType>>& board) {
-    std::vector<QPoint> emptyPositions;
-    for (int i = 0; i < board.size(); i++) {
-        for (int j = 0; j < board[i].size(); j++) {
-            if (board[i][j] == PieceType::None) {
-                emptyPositions.emplace_back(i, j);
+std::vector<Move> RuleBasedAI::getEmptyPositions(const Board& board) {
+    std::vector<Move> emptyPositions;
+    int size = board.getSize();
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            if (board.getPiece(i, j) == PieceType::NONE) {
+                emptyPositions.emplace_back(Move{i, j});
             }
         }
     }

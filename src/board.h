@@ -35,9 +35,11 @@ public:
      * @param aiStrategy AI策略名称
      * @param difficulty AI难度（1-5）
      * @param undoLimit 允许的悔棋次数
+     * @param playerPieceType 玩家选择的棋子颜色（仅在AI模式下有效）
      */
     void resetGame(bool enableAI = false, const QString& aiStrategy = "RuleBased",
-                  int difficulty = 3, int undoLimit = 3);
+                  int difficulty = 3, int undoLimit = 3, 
+                  PieceType playerPieceType = PieceType::BLACK);
 
     /**
      * @brief 保存当前游戏状态
@@ -59,6 +61,39 @@ public:
      */
     void setAIStrategy(const QString& strategyName);
 
+    /**
+     * @brief 获取棋盘大小
+     */
+    int getSize() const { return BOARD_SIZE; }
+
+    /**
+     * @brief 获取指定位置的棋子类型
+     */
+    PieceType getPiece(int row, int col) const { return board[row][col]; }
+
+    /**
+     * @brief 在指定位置放置棋子
+     */
+    void placePiece(int row, int col, PieceType piece) { board[row][col] = piece; }
+
+    /**
+     * @brief 获取棋盘状态
+     */
+    std::vector<std::vector<PieceType>> getBoardState() const { return board; }
+
+    /**
+     * @brief 设置棋盘状态
+     */
+    void setBoardState(const std::vector<std::vector<PieceType>>& newBoard) { board = newBoard; }
+
+    /**
+     * @brief 检查是否获胜
+     * @param row 行号
+     * @param col 列号
+     * @return 是否获胜
+     */
+    bool checkWin(int row, int col);
+
 protected:
     /**
      * @brief 绘制事件处理函数
@@ -76,16 +111,6 @@ private:
     static const int BOARD_SIZE = 15;    ///< 棋盘大小（15x15）
     static const int CELL_SIZE = 35;     ///< 每个格子的大小（像素）
     static const int MARGIN = 20;        ///< 棋盘边距（像素）
-    
-    /**
-     * @brief 移动记录结构体
-     */
-    struct Move {
-        int row;
-        int col;
-        PieceType player;
-        Move(int r, int c, PieceType p) : row(r), col(c), player(p) {}
-    };
 
     /**
      * @brief 获胜连线结构体
@@ -103,6 +128,7 @@ private:
     bool gameOver;                          ///< 游戏是否结束
     bool aiEnabled;                         ///< 是否启用AI
     std::unique_ptr<AIStrategy> aiStrategy;     ///< AI策略
+    PieceType playerPieceType;                 ///< 玩家选择的棋子颜色
     
     int remainingUndos;                     ///< 剩余悔棋次数
     std::stack<Move> moveHistory;           ///< 移动历史记录
@@ -133,14 +159,6 @@ private:
      * @param painter 画笔对象
      */
     void drawWinLine(QPainter &painter);
-
-    /**
-     * @brief 检查是否获胜
-     * @param row 行号
-     * @param col 列号
-     * @return 是否获胜
-     */
-    bool checkWin(int row, int col);
 
     /**
      * @brief 棋盘坐标转像素坐标
@@ -181,6 +199,14 @@ private:
      * @return AI策略实例
      */
     std::unique_ptr<AIStrategy> createAIStrategy(const QString& strategyName);
+
+    /**
+     * @brief 检查当前是否轮到AI下棋
+     * @return 是否轮到AI下棋
+     */
+    bool isAITurn() const {
+        return aiEnabled && currentPlayer != playerPieceType;
+    }
 };
 
 #endif // BOARD_H 

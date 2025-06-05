@@ -5,14 +5,16 @@
 #include <QTimer>
 #include <chrono>
 #include "rule_based_ai.h"
+#include "astar_ai.h"
 
 Board::Board(QWidget *parent)
     : QWidget(parent)
-    , board(BOARD_SIZE, std::vector<PieceType>(BOARD_SIZE, PieceType::None))
-    , currentPlayer(PieceType::Black)
+    , board(BOARD_SIZE, std::vector<PieceType>(BOARD_SIZE, PieceType::NONE))
+    , currentPlayer(PieceType::BLACK)
     , gameOver(false)
     , aiEnabled(false)
     , aiStrategy(nullptr)
+    , playerPieceType(PieceType::BLACK)
     , remainingUndos(3)
     , lastMove(QPoint(-1, -1))
     , winLine()
@@ -22,18 +24,25 @@ Board::Board(QWidget *parent)
     setContextMenuPolicy(Qt::PreventContextMenu);
 }
 
-void Board::resetGame(bool enableAI, const QString& aiStrategy, int difficulty, int undoLimit)
+void Board::resetGame(bool enableAI, const QString& aiStrategy, int difficulty, 
+                     int undoLimit, PieceType playerPieceType)
 {
     board = std::vector<std::vector<PieceType>>(
-        BOARD_SIZE, std::vector<PieceType>(BOARD_SIZE, PieceType::None));
-    currentPlayer = PieceType::Black;
+        BOARD_SIZE, std::vector<PieceType>(BOARD_SIZE, PieceType::NONE));
+    currentPlayer = PieceType::BLACK;
     gameOver = false;
     aiEnabled = enableAI;
     remainingUndos = undoLimit;
+    this->playerPieceType = playerPieceType;
     
     if (enableAI) {
         setAIStrategy(aiStrategy);
         this->aiStrategy->setDifficulty(difficulty);
+        
+        // 如果玩家选择执白，AI先手
+        if (playerPieceType == PieceType::WHITE) {
+            QTimer::singleShot(100, this, &Board::makeAIMove);
+        }
     } else {
         this->aiStrategy.reset();
     }
@@ -57,6 +66,8 @@ std::unique_ptr<AIStrategy> Board::createAIStrategy(const QString& strategyName)
 {
     if (strategyName == "RuleBased") {
         return std::make_unique<RuleBasedAI>();
+    } else if (strategyName == "AStar") {
+        return std::make_unique<AStarAI>();
     }
     // 在这里添加其他AI策略的创建
     return std::make_unique<RuleBasedAI>();  // 默认使用规则基础AI
@@ -102,11 +113,11 @@ void Board::drawPieces(QPainter &painter)
     // 遍历棋盘，绘制所有棋子
     for (int row = 0; row < BOARD_SIZE; ++row) {
         for (int col = 0; col < BOARD_SIZE; ++col) {
-            if (board[row][col] != PieceType::None) {
+            if (board[row][col] != PieceType::NONE) {
                 // 计算棋子位置
                 QPoint pos = boardToPixel(row, col);
                 // 设置棋子颜色
-                QColor color = (board[row][col] == PieceType::Black) ? Qt::black : Qt::white;
+                QColor color = (board[row][col] == PieceType::BLACK) ? Qt::black : Qt::white;
                 painter.setPen(Qt::black);
                 painter.setBrush(color);
                 // 绘制棋子（圆形）
@@ -128,13 +139,18 @@ void Board::mousePressEvent(QMouseEvent *event)
         return;
     }
 
+    // 如果是AI回合，不允许玩家操作
+    if (isAITurn()) {
+        return;
+    }
+
     QPoint boardPos = pixelToBoard(event->x(), event->y());
     int row = boardPos.x();
     int col = boardPos.y();
 
     // 检查是否在有效范围内且该位置为空
     if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE &&
-        board[row][col] == PieceType::None) {
+        board[row][col] == PieceType::NONE) {
         // 记录移动
         moveHistory.push(Move(row, col, currentPlayer));
         board[row][col] = currentPlayer;
@@ -149,10 +165,10 @@ void Board::mousePressEvent(QMouseEvent *event)
         }
 
         // 切换玩家
-        currentPlayer = (currentPlayer == PieceType::Black) ? PieceType::White : PieceType::Black;
+        currentPlayer = (currentPlayer == PieceType::BLACK) ? PieceType::WHITE : PieceType::BLACK;
 
         // 如果启用AI且当前是AI的回合
-        if (aiEnabled && currentPlayer == PieceType::White) {
+        if (isAITurn()) {
             update();
             QTimer::singleShot(100, this, &Board::makeAIMove);
         }
@@ -163,21 +179,41 @@ void Board::mousePressEvent(QMouseEvent *event)
 
 bool Board::undoMove()
 {
-    if (moveHistory.empty() || gameOver) {
+    if (moveHistory.empty() || gameOver || remainingUndos <= 0) {
         return false;
     }
 
-    // 获取最后一步移动
-    Move lastMove = moveHistory.top();
-    moveHistory.pop();
-
-    // 恢复棋盘状态
-    board[lastMove.row][lastMove.col] = PieceType::None;
-    currentPlayer = lastMove.player;
-
-    // 减少剩余悔棋次数（仅在玩家回合减少）
-    if (!aiEnabled || lastMove.player == PieceType::Black) {
+    // 在AI模式下，需要撤销两步（玩家和AI的移动）
+    if (aiEnabled) {
+        // 先撤销AI的移动
+        if (!moveHistory.empty()) {
+            Move lastMove = moveHistory.top();
+            moveHistory.pop();
+            board[lastMove.row][lastMove.col] = PieceType::NONE;
+        }
+        // 再撤销玩家的移动
+        if (!moveHistory.empty()) {
+            Move playerMove = moveHistory.top();
+            moveHistory.pop();
+            board[playerMove.row][playerMove.col] = PieceType::NONE;
+            currentPlayer = playerMove.player;
+        }
         remainingUndos--;
+    } else {
+        // 双人模式下只需撤销一步
+        Move lastMove = moveHistory.top();
+        moveHistory.pop();
+        board[lastMove.row][lastMove.col] = PieceType::NONE;
+        currentPlayer = lastMove.player;
+        remainingUndos--;
+    }
+
+    // 更新最后落子位置
+    if (!moveHistory.empty()) {
+        Move lastMove = moveHistory.top();
+        this->lastMove = QPoint(lastMove.row, lastMove.col);
+    } else {
+        this->lastMove = QPoint(-1, -1);
     }
 
     return true;
@@ -185,23 +221,23 @@ bool Board::undoMove()
 
 void Board::makeAIMove()
 {
-    if (gameOver || !aiEnabled || !aiStrategy || currentPlayer != PieceType::White) {
+    if (gameOver || !aiEnabled || !aiStrategy || currentPlayer != PieceType::WHITE) {
         return;
     }
 
-    QPoint move = aiStrategy->getNextMove(board, currentPlayer);
-    if (move.x() >= 0 && move.x() < BOARD_SIZE && 
-        move.y() >= 0 && move.y() < BOARD_SIZE) {
+    Move move = aiStrategy->getNextMove(*this, currentPlayer);
+    if (move.row >= 0 && move.row < BOARD_SIZE && 
+        move.col >= 0 && move.col < BOARD_SIZE) {
         
-        moveHistory.push(Move(move.x(), move.y(), currentPlayer));
-        board[move.x()][move.y()] = currentPlayer;
-        lastMove = move;
+        moveHistory.push(Move(move.row, move.col, currentPlayer));
+        board[move.row][move.col] = currentPlayer;
+        lastMove = QPoint(move.row, move.col);
         
-        if (checkWin(move.x(), move.y())) {
+        if (checkWin(move.row, move.col)) {
             gameOver = true;
             showGameOver(currentPlayer);
         } else {
-            currentPlayer = PieceType::Black;
+            currentPlayer = PieceType::BLACK;
         }
         
         update();
@@ -278,7 +314,20 @@ QPoint Board::pixelToBoard(int x, int y) const
 
 void Board::showGameOver(PieceType winner)
 {
-    QString message = (winner == PieceType::Black) ? "黑方胜利！" : "白方胜利！";
+    QString message;
+    if (aiEnabled) {
+        if (winner == playerPieceType) {
+            // 玩家获胜
+            QString aiName = (aiStrategy->getName() == "AStar") ? "启发式搜索AI" : "规则基础AI";
+            message = QString("恭喜！你成功挑战了难度%1的%2！").arg(aiStrategy->getDifficulty()).arg(aiName);
+        } else {
+            // AI获胜
+            message = "AI获胜了，再接再厉！";
+        }
+    } else {
+        // 双人对战
+        message = (winner == PieceType::BLACK) ? "黑方胜利！" : "白方胜利！";
+    }
     QMessageBox::information(this, "游戏结束", message);
 }
 

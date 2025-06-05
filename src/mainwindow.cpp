@@ -11,6 +11,7 @@ MainWindow::MainWindow(QWidget *parent)
     , currentAIStrategy("RuleBased")
     , currentAIDifficulty(3)
     , currentUndoLimit(3)
+    , currentPlayerPieceType(PieceType::BLACK)
 {
     // 设置窗口标题
     setWindowTitle("五子棋");
@@ -66,7 +67,8 @@ void MainWindow::resetGame()
     board->resetGame(currentGameMode == GameDialog::GameMode::PlayerVsAI,
                     currentAIStrategy,
                     currentAIDifficulty,
-                    currentUndoLimit);
+                    currentUndoLimit,
+                    currentPlayerPieceType);
 }
 
 void MainWindow::newGame()
@@ -79,6 +81,7 @@ void MainWindow::newGame()
         currentAIStrategy = dialog.getAIStrategy();
         currentAIDifficulty = dialog.getAIDifficulty();
         currentUndoLimit = dialog.getUndoLimit();
+        currentPlayerPieceType = dialog.getPlayerPieceType();
         // 使用新的设置重置游戏
         resetGame();
     }

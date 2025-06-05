@@ -6,6 +6,7 @@
 #include <QString>
 #include "board.h"
 #include "gamedialog.h"
+#include "game_types.h"
 
 /**
  * @brief 主窗口类
@@ -51,6 +52,7 @@ private:
     QString currentAIStrategy;   ///< 当前AI策略
     int currentAIDifficulty;    ///< 当前AI难度
     int currentUndoLimit;       ///< 当前允许的悔棋次数
+    PieceType currentPlayerPieceType; ///< 当前玩家选择的棋子颜色
 };
 
 #endif // MAINWINDOW_H 
