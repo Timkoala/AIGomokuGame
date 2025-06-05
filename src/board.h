@@ -1,0 +1,107 @@
+#ifndef BOARD_H
+#define BOARD_H
+
+#include <QWidget>
+#include <vector>
+
+/**
+ * @brief 棋盘类
+ * 
+ * Board类负责实现五子棋的核心游戏逻辑，包括：
+ * - 棋盘的绘制
+ * - 落子的处理
+ * - 胜负的判断
+ * - 游戏状态的管理
+ */
+class Board : public QWidget {
+    Q_OBJECT
+
+public:
+    /**
+     * @brief 构造函数
+     * @param parent 父窗口指针
+     */
+    explicit Board(QWidget *parent = nullptr);
+
+    /**
+     * @brief 重置游戏
+     * 
+     * 清空棋盘，重置游戏状态
+     */
+    void resetGame();
+
+protected:
+    /**
+     * @brief 绘制事件处理函数
+     * @param event 绘制事件对象
+     */
+    void paintEvent(QPaintEvent *event) override;
+
+    /**
+     * @brief 鼠标按下事件处理函数
+     * @param event 鼠标事件对象
+     */
+    void mousePressEvent(QMouseEvent *event) override;
+
+private:
+    static const int BOARD_SIZE = 15;    ///< 棋盘大小（15x15）
+    static const int CELL_SIZE = 35;     ///< 每个格子的大小（像素）
+    static const int MARGIN = 20;        ///< 棋盘边距（像素）
+    
+    /**
+     * @brief 玩家枚举
+     */
+    enum class Player { 
+        None,   ///< 空位
+        Black,  ///< 黑方
+        White   ///< 白方
+    };
+
+    std::vector<std::vector<Player>> board;  ///< 棋盘状态数组
+    Player currentPlayer;                    ///< 当前玩家
+    bool gameOver;                          ///< 游戏是否结束
+
+    /**
+     * @brief 绘制棋盘
+     * @param painter 画笔对象
+     */
+    void drawBoard(QPainter &painter);
+
+    /**
+     * @brief 绘制棋子
+     * @param painter 画笔对象
+     */
+    void drawPieces(QPainter &painter);
+
+    /**
+     * @brief 检查是否获胜
+     * @param row 行号
+     * @param col 列号
+     * @return 是否获胜
+     */
+    bool checkWin(int row, int col);
+
+    /**
+     * @brief 棋盘坐标转像素坐标
+     * @param row 行号
+     * @param col 列号
+     * @return 像素坐标
+     */
+    QPoint boardToPixel(int row, int col) const;
+
+    /**
+     * @brief 像素坐标转棋盘坐标
+     * @param x X坐标
+     * @param y Y坐标
+     * @return 棋盘坐标
+     */
+    QPoint pixelToBoard(int x, int y) const;
+
+    /**
+     * @brief 显示游戏结束对话框
+     * @param winner 获胜方
+     */
+    void showGameOver(Player winner);
+};
+
+#endif // BOARD_H 
