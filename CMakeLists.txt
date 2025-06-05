@@ -28,6 +28,14 @@ add_executable(AIGomokuGame
     src/board.h
     src/gamedialog.cpp
     src/gamedialog.h
+    src/gamesave.cpp
+    src/gamesave.h
+    src/game_types.h
+    src/ai_strategy.h
+    src/rule_based_ai.cpp
+    src/rule_based_ai.h
+    src/astar_ai.cpp
+    src/astar_ai.h
 )
 
 # 链接Qt6::Widgets库
