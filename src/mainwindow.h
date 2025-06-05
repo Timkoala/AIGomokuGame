@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QPushButton>
+#include <QString>
 #include "board.h"
 #include "gamedialog.h"
 
@@ -47,8 +48,9 @@ private:
     QPushButton *saveButton;    ///< 保存游戏按钮指针
     QPushButton *loadButton;    ///< 加载游戏按钮指针
     GameDialog::GameMode currentGameMode;  ///< 当前游戏模式
-    int currentAIDifficulty;   ///< 当前AI难度
-    int currentUndoLimit;      ///< 当前允许的悔棋次数
+    QString currentAIStrategy;   ///< 当前AI策略
+    int currentAIDifficulty;    ///< 当前AI难度
+    int currentUndoLimit;       ///< 当前允许的悔棋次数
 };
 
 #endif // MAINWINDOW_H 

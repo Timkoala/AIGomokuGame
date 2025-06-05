@@ -10,4 +10,17 @@ enum class Player {
     White   ///< 白方
 };
 
+// 棋子类型
+enum class PieceType {
+    None,   // 空位置
+    Black,  // 黑棋
+    White   // 白棋
+};
+
+// AI策略类型
+enum class AIStrategyType {
+    RuleBased,  // 基于规则的AI
+    // 后续可以添加更多AI策略类型
+};
+
 #endif // GAME_TYPES_H 

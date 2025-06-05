@@ -96,7 +96,7 @@ bool GameSave::loadGame(const QString& filename, SaveData& data)
         data.history.emplace_back(
             moveObj["row"].toInt(),
             moveObj["col"].toInt(),
-            static_cast<Player>(moveObj["player"].toInt())
+            static_cast<PieceType>(moveObj["player"].toInt())
         );
     }
     

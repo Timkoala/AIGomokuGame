@@ -8,6 +8,7 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , currentGameMode(GameDialog::GameMode::PlayerVsPlayer)
+    , currentAIStrategy("RuleBased")
     , currentAIDifficulty(3)
     , currentUndoLimit(3)
 {
@@ -62,7 +63,8 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::resetGame()
 {
     // 使用当前的游戏模式重置游戏
-    board->resetGame(currentGameMode == GameDialog::GameMode::PlayerVsAI, 
+    board->resetGame(currentGameMode == GameDialog::GameMode::PlayerVsAI,
+                    currentAIStrategy,
                     currentAIDifficulty,
                     currentUndoLimit);
 }
@@ -74,6 +76,7 @@ void MainWindow::newGame()
     if (dialog.exec() == QDialog::Accepted) {
         // 保存设置
         currentGameMode = dialog.getGameMode();
+        currentAIStrategy = dialog.getAIStrategy();
         currentAIDifficulty = dialog.getAIDifficulty();
         currentUndoLimit = dialog.getUndoLimit();
         // 使用新的设置重置游戏

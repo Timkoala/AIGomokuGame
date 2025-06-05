@@ -5,6 +5,7 @@
 #include <QComboBox>
 #include <QSpinBox>
 #include <QLabel>
+#include <QString>
 
 /**
  * @brief 游戏设置对话框类
@@ -33,6 +34,11 @@ public:
     GameMode getGameMode() const { return gameMode; }
 
     /**
+     * @brief 获取选择的AI策略
+     */
+    QString getAIStrategy() const { return aiStrategy; }
+
+    /**
      * @brief 获取AI难度等级
      */
     int getAIDifficulty() const { return aiDifficulty; }
@@ -49,20 +55,28 @@ private slots:
     void onGameModeChanged(int index);
 
     /**
+     * @brief AI策略改变时的处理函数
+     */
+    void onAIStrategyChanged(int index);
+
+    /**
      * @brief 确认按钮点击处理函数
      */
     void onOkClicked();
 
 private:
     GameMode gameMode;        ///< 当前选择的游戏模式
+    QString aiStrategy;       ///< 当前选择的AI策略
     int aiDifficulty;        ///< AI难度等级（1-5）
     int undoLimit;           ///< 允许的悔棋次数
     
-    QComboBox *modeComboBox;  ///< 游戏模式选择框
-    QLabel *difficultyLabel;  ///< AI难度标签
-    QSpinBox *difficultySpinBox;  ///< AI难度选择框
-    QLabel *undoLabel;        ///< 悔棋次数标签
-    QSpinBox *undoSpinBox;    ///< 悔棋次数选择框
+    QComboBox *modeComboBox;     ///< 游戏模式选择框
+    QComboBox *strategyComboBox; ///< AI策略选择框
+    QLabel *strategyLabel;       ///< AI策略标签
+    QLabel *difficultyLabel;     ///< AI难度标签
+    QSpinBox *difficultySpinBox; ///< AI难度选择框
+    QLabel *undoLabel;           ///< 悔棋次数标签
+    QSpinBox *undoSpinBox;       ///< 悔棋次数选择框
 };
 
 #endif // GAMEDIALOG_H 

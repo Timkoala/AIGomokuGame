@@ -5,8 +5,10 @@
 #include <vector>
 #include <random>
 #include <stack>
+#include <memory>
 #include "game_types.h"
 #include "gamesave.h"
+#include "ai_strategy.h"
 
 /**
  * @brief 棋盘类
@@ -30,10 +32,12 @@ public:
     /**
      * @brief 重置游戏
      * @param enableAI 是否启用AI
+     * @param aiStrategy AI策略名称
      * @param difficulty AI难度（1-5）
      * @param undoLimit 允许的悔棋次数
      */
-    void resetGame(bool enableAI = false, int difficulty = 3, int undoLimit = 3);
+    void resetGame(bool enableAI = false, const QString& aiStrategy = "RuleBased",
+                  int difficulty = 3, int undoLimit = 3);
 
     /**
      * @brief 保存当前游戏状态
@@ -48,6 +52,12 @@ public:
      * @return 是否加载成功
      */
     bool loadGameState(const QString& filename);
+
+    /**
+     * @brief 设置AI策略
+     * @param strategyName AI策略名称
+     */
+    void setAIStrategy(const QString& strategyName);
 
 protected:
     /**
@@ -73,8 +83,8 @@ private:
     struct Move {
         int row;
         int col;
-        Player player;
-        Move(int r, int c, Player p) : row(r), col(c), player(p) {}
+        PieceType player;
+        Move(int r, int c, PieceType p) : row(r), col(c), player(p) {}
     };
 
     /**
@@ -88,12 +98,11 @@ private:
         WinLine(const QPoint& s, const QPoint& e) : start(s), end(e), valid(true) {}
     };
 
-    std::vector<std::vector<Player>> board;  ///< 棋盘状态数组
-    Player currentPlayer;                    ///< 当前玩家
+    std::vector<std::vector<PieceType>> board;  ///< 棋盘状态数组
+    PieceType currentPlayer;                    ///< 当前玩家
     bool gameOver;                          ///< 游戏是否结束
     bool aiEnabled;                         ///< 是否启用AI
-    int aiDifficulty;                       ///< AI难度等级
-    std::mt19937 rng;                       ///< 随机数生成器
+    std::unique_ptr<AIStrategy> aiStrategy;     ///< AI策略
     
     int remainingUndos;                     ///< 剩余悔棋次数
     std::stack<Move> moveHistory;           ///< 移动历史记录
@@ -153,7 +162,7 @@ private:
      * @brief 显示游戏结束对话框
      * @param winner 获胜方
      */
-    void showGameOver(Player winner);
+    void showGameOver(PieceType winner);
 
     /**
      * @brief AI下棋
@@ -161,25 +170,17 @@ private:
     void makeAIMove();
 
     /**
-     * @brief 评估位置分数
-     * @param row 行号
-     * @param col 列号
-     * @param player 待评估的玩家
-     * @return 位置分数
-     */
-    int evaluatePosition(int row, int col, Player player);
-
-    /**
-     * @brief 获取所有可能的移动位置
-     * @return 可能的移动位置列表
-     */
-    std::vector<std::pair<int, int>> getAvailableMoves();
-
-    /**
      * @brief 执行悔棋操作
      * @return 是否成功悔棋
      */
     bool undoMove();
+
+    /**
+     * @brief 创建AI策略实例
+     * @param strategyName 策略名称
+     * @return AI策略实例
+     */
+    std::unique_ptr<AIStrategy> createAIStrategy(const QString& strategyName);
 };
 
 #endif // BOARD_H 

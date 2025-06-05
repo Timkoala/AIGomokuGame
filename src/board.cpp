@@ -4,47 +4,62 @@
 #include <QMessageBox>
 #include <QTimer>
 #include <chrono>
+#include "rule_based_ai.h"
 
 Board::Board(QWidget *parent)
     : QWidget(parent)
-    , board(BOARD_SIZE, std::vector<Player>(BOARD_SIZE, Player::None))  // 初始化棋盘数组
-    , currentPlayer(Player::Black)  // 黑方先手
-    , gameOver(false)  // 初始化游戏状态
+    , board(BOARD_SIZE, std::vector<PieceType>(BOARD_SIZE, PieceType::None))
+    , currentPlayer(PieceType::Black)
+    , gameOver(false)
     , aiEnabled(false)
-    , aiDifficulty(3)
-    , rng(std::chrono::steady_clock::now().time_since_epoch().count())
+    , aiStrategy(nullptr)
     , remainingUndos(3)
     , lastMove(QPoint(-1, -1))
     , winLine()
 {
-    // 设置固定大小
     setFixedSize(BOARD_SIZE * CELL_SIZE + 2 * MARGIN,
                  BOARD_SIZE * CELL_SIZE + 2 * MARGIN);
-    // 启用右键点击
     setContextMenuPolicy(Qt::PreventContextMenu);
 }
 
-void Board::resetGame(bool enableAI, int difficulty, int undoLimit)
+void Board::resetGame(bool enableAI, const QString& aiStrategy, int difficulty, int undoLimit)
 {
-    // 重置棋盘状态
-    board = std::vector<std::vector<Player>>(
-        BOARD_SIZE, std::vector<Player>(BOARD_SIZE, Player::None));
-    currentPlayer = Player::Black;
+    board = std::vector<std::vector<PieceType>>(
+        BOARD_SIZE, std::vector<PieceType>(BOARD_SIZE, PieceType::None));
+    currentPlayer = PieceType::Black;
     gameOver = false;
     aiEnabled = enableAI;
-    aiDifficulty = difficulty;
     remainingUndos = undoLimit;
     
-    // 清空移动历史
+    if (enableAI) {
+        setAIStrategy(aiStrategy);
+        this->aiStrategy->setDifficulty(difficulty);
+    } else {
+        this->aiStrategy.reset();
+    }
+    
     while (!moveHistory.empty()) {
         moveHistory.pop();
     }
     
-    // 重置最后落子位置和获胜连线
     lastMove = QPoint(-1, -1);
     winLine = WinLine();
     
     update();
+}
+
+void Board::setAIStrategy(const QString& strategyName)
+{
+    aiStrategy = createAIStrategy(strategyName);
+}
+
+std::unique_ptr<AIStrategy> Board::createAIStrategy(const QString& strategyName)
+{
+    if (strategyName == "RuleBased") {
+        return std::make_unique<RuleBasedAI>();
+    }
+    // 在这里添加其他AI策略的创建
+    return std::make_unique<RuleBasedAI>();  // 默认使用规则基础AI
 }
 
 void Board::paintEvent(QPaintEvent *event)
@@ -87,11 +102,11 @@ void Board::drawPieces(QPainter &painter)
     // 遍历棋盘，绘制所有棋子
     for (int row = 0; row < BOARD_SIZE; ++row) {
         for (int col = 0; col < BOARD_SIZE; ++col) {
-            if (board[row][col] != Player::None) {
+            if (board[row][col] != PieceType::None) {
                 // 计算棋子位置
                 QPoint pos = boardToPixel(row, col);
                 // 设置棋子颜色
-                QColor color = (board[row][col] == Player::Black) ? Qt::black : Qt::white;
+                QColor color = (board[row][col] == PieceType::Black) ? Qt::black : Qt::white;
                 painter.setPen(Qt::black);
                 painter.setBrush(color);
                 // 绘制棋子（圆形）
@@ -119,7 +134,7 @@ void Board::mousePressEvent(QMouseEvent *event)
 
     // 检查是否在有效范围内且该位置为空
     if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE &&
-        board[row][col] == Player::None) {
+        board[row][col] == PieceType::None) {
         // 记录移动
         moveHistory.push(Move(row, col, currentPlayer));
         board[row][col] = currentPlayer;
@@ -134,10 +149,10 @@ void Board::mousePressEvent(QMouseEvent *event)
         }
 
         // 切换玩家
-        currentPlayer = (currentPlayer == Player::Black) ? Player::White : Player::Black;
+        currentPlayer = (currentPlayer == PieceType::Black) ? PieceType::White : PieceType::Black;
 
         // 如果启用AI且当前是AI的回合
-        if (aiEnabled && currentPlayer == Player::White) {
+        if (aiEnabled && currentPlayer == PieceType::White) {
             update();
             QTimer::singleShot(100, this, &Board::makeAIMove);
         }
@@ -157,11 +172,11 @@ bool Board::undoMove()
     moveHistory.pop();
 
     // 恢复棋盘状态
-    board[lastMove.row][lastMove.col] = Player::None;
+    board[lastMove.row][lastMove.col] = PieceType::None;
     currentPlayer = lastMove.player;
 
     // 减少剩余悔棋次数（仅在玩家回合减少）
-    if (!aiEnabled || lastMove.player == Player::Black) {
+    if (!aiEnabled || lastMove.player == PieceType::Black) {
         remainingUndos--;
     }
 
@@ -170,144 +185,27 @@ bool Board::undoMove()
 
 void Board::makeAIMove()
 {
-    if (gameOver || !aiEnabled || currentPlayer != Player::White) {
+    if (gameOver || !aiEnabled || !aiStrategy || currentPlayer != PieceType::White) {
         return;
     }
 
-    // 获取所有可能的移动
-    auto moves = getAvailableMoves();
-    if (moves.empty()) {
-        return;
-    }
-
-    // 根据难度选择最佳移动
-    std::pair<int, int> bestMove = moves[0];
-    int bestScore = -1;
-
-    for (const auto &move : moves) {
-        int score = evaluatePosition(move.first, move.second, Player::White);
+    QPoint move = aiStrategy->getNextMove(board, currentPlayer);
+    if (move.x() >= 0 && move.x() < BOARD_SIZE && 
+        move.y() >= 0 && move.y() < BOARD_SIZE) {
         
-        if (score > bestScore) {
-            bestScore = score;
-            bestMove = move;
-        } else if (score == bestScore && 
-                  std::uniform_int_distribution<>(1, 5)(rng) > aiDifficulty) {
-            bestMove = move;
+        moveHistory.push(Move(move.x(), move.y(), currentPlayer));
+        board[move.x()][move.y()] = currentPlayer;
+        lastMove = move;
+        
+        if (checkWin(move.x(), move.y())) {
+            gameOver = true;
+            showGameOver(currentPlayer);
+        } else {
+            currentPlayer = PieceType::Black;
         }
+        
+        update();
     }
-
-    // 记录AI的移动
-    moveHistory.push(Move(bestMove.first, bestMove.second, Player::White));
-
-    // 执行移动
-    board[bestMove.first][bestMove.second] = Player::White;
-    
-    if (checkWin(bestMove.first, bestMove.second)) {
-        gameOver = true;
-        showGameOver(Player::White);
-    } else {
-        currentPlayer = Player::Black;
-    }
-    
-    update();
-}
-
-std::vector<std::pair<int, int>> Board::getAvailableMoves()
-{
-    std::vector<std::pair<int, int>> moves;
-    moves.reserve(BOARD_SIZE * BOARD_SIZE);
-
-    // 首先检查已有棋子周围的空位
-    std::vector<std::vector<bool>> checked(BOARD_SIZE, std::vector<bool>(BOARD_SIZE, false));
-    
-    for (int row = 0; row < BOARD_SIZE; ++row) {
-        for (int col = 0; col < BOARD_SIZE; ++col) {
-            if (board[row][col] != Player::None) {
-                // 检查周围8个方向
-                for (int dr = -1; dr <= 1; ++dr) {
-                    for (int dc = -1; dc <= 1; ++dc) {
-                        if (dr == 0 && dc == 0) continue;
-                        
-                        int newRow = row + dr;
-                        int newCol = col + dc;
-                        
-                        if (newRow >= 0 && newRow < BOARD_SIZE && 
-                            newCol >= 0 && newCol < BOARD_SIZE &&
-                            !checked[newRow][newCol] &&
-                            board[newRow][newCol] == Player::None) {
-                            moves.emplace_back(newRow, newCol);
-                            checked[newRow][newCol] = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // 如果是空棋盘或没有找到合适的位置，返回中心位置
-    if (moves.empty()) {
-        moves.emplace_back(BOARD_SIZE / 2, BOARD_SIZE / 2);
-    }
-
-    return moves;
-}
-
-int Board::evaluatePosition(int row, int col, Player player)
-{
-    int score = 0;
-    const std::vector<std::pair<int, int>> directions = {
-        {1, 0}, {0, 1}, {1, 1}, {1, -1}
-    };
-
-    // 临时放置棋子以评估位置
-    board[row][col] = player;
-
-    for (const auto &dir : directions) {
-        int count = 1;
-        bool blocked = false;
-
-        // 向正方向检查
-        for (int i = 1; i < 5; ++i) {
-            int newRow = row + dir.first * i;
-            int newCol = col + dir.second * i;
-            if (newRow < 0 || newRow >= BOARD_SIZE || newCol < 0 || newCol >= BOARD_SIZE) {
-                blocked = true;
-                break;
-            }
-            if (board[newRow][newCol] != player) {
-                if (board[newRow][newCol] != Player::None) blocked = true;
-                break;
-            }
-            count++;
-        }
-
-        // 向反方向检查
-        for (int i = 1; i < 5; ++i) {
-            int newRow = row - dir.first * i;
-            int newCol = col - dir.second * i;
-            if (newRow < 0 || newRow >= BOARD_SIZE || newCol < 0 || newCol >= BOARD_SIZE) {
-                blocked = true;
-                break;
-            }
-            if (board[newRow][newCol] != player) {
-                if (board[newRow][newCol] != Player::None) blocked = true;
-                break;
-            }
-            count++;
-        }
-
-        // 根据连子数和是否被封堵计算分数
-        if (count >= 5) score += 100000;
-        else if (count == 4) score += blocked ? 1000 : 10000;
-        else if (count == 3) score += blocked ? 100 : 1000;
-        else if (count == 2) score += blocked ? 10 : 100;
-        else score += blocked ? 1 : 10;
-    }
-
-    // 移除临时放置的棋子
-    board[row][col] = Player::None;
-
-    return score;
 }
 
 bool Board::checkWin(int row, int col)
@@ -323,7 +221,7 @@ bool Board::checkWin(int row, int col)
     // 检查每个方向
     for (const auto &dir : directions) {
         int count = 1;  // 当前方向的连续棋子数
-        Player current = board[row][col];  // 当前玩家
+        PieceType current = board[row][col];  // 当前玩家
         
         QPoint start(row, col);
         QPoint end(row, col);
@@ -378,10 +276,9 @@ QPoint Board::pixelToBoard(int x, int y) const
     return QPoint(row, col);
 }
 
-void Board::showGameOver(Player winner)
+void Board::showGameOver(PieceType winner)
 {
-    // 显示游戏结束对话框
-    QString message = (winner == Player::Black) ? "黑方胜利！" : "白方胜利！";
+    QString message = (winner == PieceType::Black) ? "黑方胜利！" : "白方胜利！";
     QMessageBox::information(this, "游戏结束", message);
 }
 
@@ -389,15 +286,13 @@ bool Board::saveGameState(const QString& filename)
 {
     GameSave::SaveData data;
     
-    // 保存基本信息
     data.timestamp = QDateTime::currentDateTime();
     data.isAIEnabled = aiEnabled;
-    data.aiDifficulty = aiDifficulty;
-    data.undoLimit = remainingUndos;  // 保存当前剩余次数作为限制
+    data.aiDifficulty = aiStrategy ? aiStrategy->getDifficulty() : 1;
+    data.undoLimit = remainingUndos;
     data.remainingUndos = remainingUndos;
     data.currentPlayer = static_cast<int>(currentPlayer);
     
-    // 保存棋盘状态
     data.board.resize(BOARD_SIZE, std::vector<int>(BOARD_SIZE));
     for (int i = 0; i < BOARD_SIZE; ++i) {
         for (int j = 0; j < BOARD_SIZE; ++j) {
@@ -405,12 +300,11 @@ bool Board::saveGameState(const QString& filename)
         }
     }
     
-    // 保存移动历史
     std::stack<Move> tempHistory = moveHistory;
     while (!tempHistory.empty()) {
         const Move& move = tempHistory.top();
         data.history.insert(data.history.begin(), 
-            GameSave::Move(move.row, move.col, move.player));  // 直接使用 Player 枚举
+            GameSave::Move(move.row, move.col, move.player));
         tempHistory.pop();
     }
     
@@ -424,29 +318,29 @@ bool Board::loadGameState(const QString& filename)
         return false;
     }
     
-    // 加载基本信息
     aiEnabled = data.isAIEnabled;
-    aiDifficulty = data.aiDifficulty;
+    if (aiEnabled) {
+        setAIStrategy("RuleBased");  // 默认使用规则基础AI
+        aiStrategy->setDifficulty(data.aiDifficulty);
+    }
     remainingUndos = data.remainingUndos;
-    currentPlayer = static_cast<Player>(data.currentPlayer);
-    gameOver = false;  // 重新加载时重置游戏结束状态
+    currentPlayer = static_cast<PieceType>(data.currentPlayer);
+    gameOver = false;
     
-    // 加载棋盘状态
     for (int i = 0; i < BOARD_SIZE; ++i) {
         for (int j = 0; j < BOARD_SIZE; ++j) {
-            board[i][j] = static_cast<Player>(data.board[i][j]);
+            board[i][j] = static_cast<PieceType>(data.board[i][j]);
         }
     }
     
-    // 加载移动历史
     while (!moveHistory.empty()) {
         moveHistory.pop();
     }
     for (const auto& move : data.history) {
-        moveHistory.push(Move(move.row, move.col, static_cast<Player>(move.player)));
+        moveHistory.push(Move(move.row, move.col, move.player));
     }
     
-    update();  // 重绘棋盘
+    update();
     return true;
 }
 

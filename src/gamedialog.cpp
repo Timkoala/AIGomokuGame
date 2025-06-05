@@ -7,6 +7,7 @@
 GameDialog::GameDialog(QWidget *parent)
     : QDialog(parent)
     , gameMode(GameMode::PlayerVsPlayer)
+    , aiStrategy("RuleBased")
     , aiDifficulty(3)
     , undoLimit(3)  // 默认允许3次悔棋
 {
@@ -24,6 +25,16 @@ GameDialog::GameDialog(QWidget *parent)
     modeLayout->addWidget(modeLabel);
     modeLayout->addWidget(modeComboBox);
     mainLayout->addLayout(modeLayout);
+    
+    // 创建AI策略选择
+    QHBoxLayout *strategyLayout = new QHBoxLayout;
+    strategyLabel = new QLabel("AI策略:", this);
+    strategyComboBox = new QComboBox(this);
+    strategyComboBox->addItem("规则基础AI");  // RuleBased
+    // 这里可以添加更多AI策略
+    strategyLayout->addWidget(strategyLabel);
+    strategyLayout->addWidget(strategyComboBox);
+    mainLayout->addLayout(strategyLayout);
     
     // 创建AI难度设置
     QHBoxLayout *difficultyLayout = new QHBoxLayout;
@@ -57,8 +68,13 @@ GameDialog::GameDialog(QWidget *parent)
     // 连接信号和槽
     connect(modeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &GameDialog::onGameModeChanged);
+    connect(strategyComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &GameDialog::onAIStrategyChanged);
     connect(buttonBox, &QDialogButtonBox::accepted, this, &GameDialog::onOkClicked);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &GameDialog::reject);
+    
+    // 初始化控件状态
+    onGameModeChanged(modeComboBox->currentIndex());
     
     // 设置窗口属性
     setModal(true);
@@ -68,9 +84,27 @@ GameDialog::GameDialog(QWidget *parent)
 void GameDialog::onGameModeChanged(int index)
 {
     gameMode = static_cast<GameMode>(index);
-    // 只在人机对战模式下启用难度设置
-    difficultyLabel->setEnabled(gameMode == GameMode::PlayerVsAI);
-    difficultySpinBox->setEnabled(gameMode == GameMode::PlayerVsAI);
+    bool isAIMode = (gameMode == GameMode::PlayerVsAI);
+    
+    // 启用/禁用AI相关控件
+    strategyLabel->setEnabled(isAIMode);
+    strategyComboBox->setEnabled(isAIMode);
+    difficultyLabel->setEnabled(isAIMode);
+    difficultySpinBox->setEnabled(isAIMode);
+}
+
+void GameDialog::onAIStrategyChanged(int index)
+{
+    // 根据选择的策略设置aiStrategy
+    switch (index) {
+        case 0:
+            aiStrategy = "RuleBased";
+            break;
+        // 这里可以添加更多策略的处理
+        default:
+            aiStrategy = "RuleBased";
+            break;
+    }
 }
 
 void GameDialog::onOkClicked()

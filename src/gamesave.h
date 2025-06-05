@@ -17,8 +17,8 @@ public:
     struct Move {
         int row;
         int col;
-        Player player;  // 使用 Player 枚举
-        Move(int r, int c, Player p) : row(r), col(c), player(p) {}
+        PieceType player;  // 使用 PieceType 枚举
+        Move(int r, int c, PieceType p) : row(r), col(c), player(p) {}
     };
 
     /**
