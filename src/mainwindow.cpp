@@ -7,6 +7,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , currentGameMode(GameDialog::GameMode::PlayerVsPlayer)
     , currentAIDifficulty(3)
+    , currentUndoLimit(3)
 {
     // 设置窗口标题
     setWindowTitle("五子棋");
@@ -49,7 +50,9 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::resetGame()
 {
     // 使用当前的游戏模式重置游戏
-    board->resetGame(currentGameMode == GameDialog::GameMode::PlayerVsAI, currentAIDifficulty);
+    board->resetGame(currentGameMode == GameDialog::GameMode::PlayerVsAI, 
+                    currentAIDifficulty,
+                    currentUndoLimit);
 }
 
 void MainWindow::newGame()
@@ -60,6 +63,7 @@ void MainWindow::newGame()
         // 保存设置
         currentGameMode = dialog.getGameMode();
         currentAIDifficulty = dialog.getAIDifficulty();
+        currentUndoLimit = dialog.getUndoLimit();
         // 使用新的设置重置游戏
         resetGame();
     }
