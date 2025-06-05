@@ -77,6 +77,17 @@ private:
         Move(int r, int c, Player p) : row(r), col(c), player(p) {}
     };
 
+    /**
+     * @brief 获胜连线结构体
+     */
+    struct WinLine {
+        QPoint start;  ///< 连线起点（棋盘坐标）
+        QPoint end;    ///< 连线终点（棋盘坐标）
+        bool valid;    ///< 是否有效
+        WinLine() : valid(false) {}
+        WinLine(const QPoint& s, const QPoint& e) : start(s), end(e), valid(true) {}
+    };
+
     std::vector<std::vector<Player>> board;  ///< 棋盘状态数组
     Player currentPlayer;                    ///< 当前玩家
     bool gameOver;                          ///< 游戏是否结束
@@ -86,6 +97,9 @@ private:
     
     int remainingUndos;                     ///< 剩余悔棋次数
     std::stack<Move> moveHistory;           ///< 移动历史记录
+
+    QPoint lastMove;                        ///< 最后一个落子位置
+    WinLine winLine;                        ///< 获胜连线
 
     /**
      * @brief 绘制棋盘
@@ -98,6 +112,18 @@ private:
      * @param painter 画笔对象
      */
     void drawPieces(QPainter &painter);
+
+    /**
+     * @brief 绘制最后落子标记
+     * @param painter 画笔对象
+     */
+    void drawLastMove(QPainter &painter);
+
+    /**
+     * @brief 绘制获胜连线
+     * @param painter 画笔对象
+     */
+    void drawWinLine(QPainter &painter);
 
     /**
      * @brief 检查是否获胜

@@ -14,6 +14,8 @@ Board::Board(QWidget *parent)
     , aiDifficulty(3)
     , rng(std::chrono::steady_clock::now().time_since_epoch().count())
     , remainingUndos(3)
+    , lastMove(QPoint(-1, -1))
+    , winLine()
 {
     // 设置固定大小
     setFixedSize(BOARD_SIZE * CELL_SIZE + 2 * MARGIN,
@@ -24,11 +26,9 @@ Board::Board(QWidget *parent)
 
 void Board::resetGame(bool enableAI, int difficulty, int undoLimit)
 {
-    // 清空棋盘
-    for (auto &row : board) {
-        std::fill(row.begin(), row.end(), Player::None);
-    }
-    // 重置游戏状态
+    // 重置棋盘状态
+    board = std::vector<std::vector<Player>>(
+        BOARD_SIZE, std::vector<Player>(BOARD_SIZE, Player::None));
     currentPlayer = Player::Black;
     gameOver = false;
     aiEnabled = enableAI;
@@ -40,20 +40,24 @@ void Board::resetGame(bool enableAI, int difficulty, int undoLimit)
         moveHistory.pop();
     }
     
-    // 重绘棋盘
+    // 重置最后落子位置和获胜连线
+    lastMove = QPoint(-1, -1);
+    winLine = WinLine();
+    
     update();
 }
 
-void Board::paintEvent(QPaintEvent *)
+void Board::paintEvent(QPaintEvent *event)
 {
-    // 创建画笔对象
     QPainter painter(this);
-    // 启用抗锯齿
-    painter.setRenderHint(QPainter::Antialiasing);
-    
-    // 绘制棋盘和棋子
+    painter.setRenderHint(QPainter::Antialiasing);  // 启用抗锯齿
+
     drawBoard(painter);
     drawPieces(painter);
+    drawLastMove(painter);
+    if (gameOver && winLine.valid) {
+        drawWinLine(painter);
+    }
 }
 
 void Board::drawBoard(QPainter &painter)
@@ -99,56 +103,46 @@ void Board::drawPieces(QPainter &painter)
 
 void Board::mousePressEvent(QMouseEvent *event)
 {
-    // 如果游戏已结束，不处理鼠标事件
-    if (gameOver || (aiEnabled && currentPlayer == Player::White)) {
-        return;
-    }
+    if (gameOver) return;
 
-    // 处理右键点击（悔棋）
     if (event->button() == Qt::RightButton) {
-        if (remainingUndos > 0 && !moveHistory.empty()) {
-            if (undoMove()) {
-                // 如果是人机对战，需要撤销两步（玩家和AI的移动）
-                if (aiEnabled && !moveHistory.empty()) {
-                    undoMove();
-                }
-                update();
-            }
-        } else if (remainingUndos <= 0) {
-            QMessageBox::information(this, "提示", "已无悔棋机会");
-        }
-        return;
-    }
-
-    // 处理左键点击（落子）
-    if (event->button() == Qt::LeftButton) {
-        QPoint pos = pixelToBoard(event->pos().x(), event->pos().y());
-        int row = pos.x();
-        int col = pos.y();
-
-        if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE &&
-            board[row][col] == Player::None) {
-            // 记录移动
-            moveHistory.push(Move(row, col, currentPlayer));
-            
-            // 放置棋子
-            board[row][col] = currentPlayer;
-            
-            if (checkWin(row, col)) {
-                gameOver = true;
-                showGameOver(currentPlayer);
-            } else {
-                currentPlayer = (currentPlayer == Player::Black) ? Player::White : Player::Black;
-                
-                // 如果启用了AI且轮到AI下棋
-                if (aiEnabled && currentPlayer == Player::White && !gameOver) {
-                    update();
-                    QTimer::singleShot(500, this, &Board::makeAIMove);
-                }
-            }
-            
+        // 右键悔棋
+        if (undoMove()) {
             update();
         }
+        return;
+    }
+
+    QPoint boardPos = pixelToBoard(event->x(), event->y());
+    int row = boardPos.x();
+    int col = boardPos.y();
+
+    // 检查是否在有效范围内且该位置为空
+    if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE &&
+        board[row][col] == Player::None) {
+        // 记录移动
+        moveHistory.push(Move(row, col, currentPlayer));
+        board[row][col] = currentPlayer;
+        lastMove = QPoint(row, col);  // 记录最后落子位置
+
+        // 检查是否获胜
+        if (checkWin(row, col)) {
+            gameOver = true;
+            showGameOver(currentPlayer);
+            update();
+            return;
+        }
+
+        // 切换玩家
+        currentPlayer = (currentPlayer == Player::Black) ? Player::White : Player::Black;
+
+        // 如果启用AI且当前是AI的回合
+        if (aiEnabled && currentPlayer == Player::White) {
+            update();
+            QTimer::singleShot(100, this, &Board::makeAIMove);
+        }
+
+        update();
     }
 }
 
@@ -330,6 +324,9 @@ bool Board::checkWin(int row, int col)
     for (const auto &dir : directions) {
         int count = 1;  // 当前方向的连续棋子数
         Player current = board[row][col];  // 当前玩家
+        
+        QPoint start(row, col);
+        QPoint end(row, col);
 
         // 向正方向检查
         for (int i = 1; i < 5; ++i) {
@@ -341,6 +338,7 @@ bool Board::checkWin(int row, int col)
                 break;
             }
             count++;
+            end = QPoint(newRow, newCol);
         }
 
         // 向反方向检查
@@ -353,10 +351,12 @@ bool Board::checkWin(int row, int col)
                 break;
             }
             count++;
+            start = QPoint(newRow, newCol);
         }
 
         // 如果任意方向达到5个连续棋子，则获胜
         if (count >= 5) {
+            winLine = WinLine(start, end);  // 记录获胜连线
             return true;
         }
     }
@@ -448,4 +448,42 @@ bool Board::loadGameState(const QString& filename)
     
     update();  // 重绘棋盘
     return true;
+}
+
+void Board::drawLastMove(QPainter &painter)
+{
+    if (!moveHistory.empty()) {
+        QPoint pixelPos = boardToPixel(lastMove.x(), lastMove.y());
+        
+        // 设置画笔
+        QPen pen(Qt::red);
+        pen.setWidth(2);
+        painter.setPen(pen);
+        
+        // 绘制一个小方框标记最后落子位置
+        const int markSize = 6;
+        painter.drawLine(pixelPos.x() - markSize, pixelPos.y() - markSize,
+                        pixelPos.x() + markSize, pixelPos.y() - markSize);
+        painter.drawLine(pixelPos.x() + markSize, pixelPos.y() - markSize,
+                        pixelPos.x() + markSize, pixelPos.y() + markSize);
+        painter.drawLine(pixelPos.x() + markSize, pixelPos.y() + markSize,
+                        pixelPos.x() - markSize, pixelPos.y() + markSize);
+        painter.drawLine(pixelPos.x() - markSize, pixelPos.y() + markSize,
+                        pixelPos.x() - markSize, pixelPos.y() - markSize);
+    }
+}
+
+void Board::drawWinLine(QPainter &painter)
+{
+    // 设置画笔
+    QPen pen(Qt::red);
+    pen.setWidth(3);
+    painter.setPen(pen);
+
+    // 获取像素坐标
+    QPoint start = boardToPixel(winLine.start.x(), winLine.start.y());
+    QPoint end = boardToPixel(winLine.end.x(), winLine.end.y());
+
+    // 绘制连线
+    painter.drawLine(start, end);
 } 
